@@ -19,14 +19,26 @@ def ironCondorModel(price_paths):
     lc_s = round(np.percentile(price_paths, 97.5))
     
     # Retrieve the option chain for SPY
-    ticker = yf.Ticker("SPY")
-    opt = ticker.option_chain("2024-06-21")  # replace with your desired expiration date
-
+    try:
+        ticker = yf.Ticker("SPY")
+        opt = ticker.option_chain("2024-06-21")  # replace with your desired expiration date
+    except:
+        ticker = yf.Ticker("SPY")
+        opt = ticker.option_chain("2024-06-21")  # replace with your desired expiration date
+        print(opt)
+    
     # Retrieve the premium for each option contract
-    sc_p = opt.calls.loc[opt.calls['strike'] == sc_s, 'lastPrice'].values[0]
-    sp_p = opt.puts.loc[opt.puts['strike'] == sp_s, 'lastPrice'].values[0]
-    lp_p = opt.puts.loc[opt.puts['strike'] == lp_s, 'lastPrice'].values[0]
-    lc_p = opt.calls.loc[opt.calls['strike'] == lc_s, 'lastPrice'].values[0]
+    try: 
+        sc_p = opt.calls.loc[opt.calls['strike'] == sc_s, 'lastPrice'].values[0]
+        sp_p = opt.puts.loc[opt.puts['strike'] == sp_s, 'lastPrice'].values[0]
+        lp_p = opt.puts.loc[opt.puts['strike'] == lp_s, 'lastPrice'].values[0]
+        lc_p = opt.calls.loc[opt.calls['strike'] == lc_s, 'lastPrice'].values[0]
+    except:
+        sc_p = opt.calls.loc[opt.calls['strike'] == sc_s, 'lastPrice'].values[0]
+        sp_p = opt.puts.loc[opt.puts['strike'] == sp_s, 'lastPrice'].values[0]
+        lp_p = opt.puts.loc[opt.puts['strike'] == lp_s, 'lastPrice'].values[0]
+        lc_p = opt.calls.loc[opt.calls['strike'] == lc_s, 'lastPrice'].values[0]
+        
     print("Strike prices: ", lp_s, sp_s, sc_s, lc_s)
     print("Premiums: ", lp_p, sp_p, sc_p, lc_p)
 
