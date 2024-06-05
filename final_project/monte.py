@@ -6,6 +6,8 @@ import yfinance as yf
 import matplotlib.pyplot as mpl
 import seaborn as sb
 from scipy.stats import norm
+from concurrent.futures import ThreadPoolExecutor
+
 
 
 class IronCondor:
@@ -26,7 +28,7 @@ class IronCondor:
         self.rr = rr
 
 def importData(ticker):
-    data = yf.download(ticker, '2022-01-01', '2024-05-10')
+    data = yf.download(ticker, '2022-01-01', '2024-06-05')
     return data
 
 def calculateRR(max_profit, max_loss_p, max_loss_c):
@@ -34,8 +36,8 @@ def calculateRR(max_profit, max_loss_p, max_loss_c):
 
 # Note that this is set up for an 80% interval, needs to be modified for different intervals
 # Expected value
-def calculateEV(rr):
-    return abs(rr)*0.8- 1*0.2
+def calculateEV(rr, interval):
+    return abs(rr)*interval - 1*(1-interval)
 
 def calculateMinRR(interval):
     return (1-interval)/interval
@@ -49,52 +51,33 @@ def calculateStrategy(sp_s, sc_s, lp_s, lc_s, sp_p, sc_p, lp_p, lc_p):
 
     return max_profit, max_loss_p, max_loss_c, break_even_p, break_even_c
 
-def ironCondorModel(price_paths):
+def ironCondorModel(price_paths, interval):
     # Define Iron Condor strikes based on percentiles and round to the nearest integer
-    sp_s = round(np.percentile(price_paths, 10))
-    sc_s = round(np.percentile(price_paths, 90))
+    offset = (100-interval*100)/2
+    sp_s = round(np.percentile(price_paths, offset))
+    sc_s = round(np.percentile(price_paths, 100-offset))
     lp_s = round(np.percentile(price_paths, 2.5)) 
     lc_s = round(np.percentile(price_paths, 97.5))
     
     # Retrieve the option chain for SPY
     try:
         ticker = yf.Ticker("SPY")
-        opt = ticker.option_chain("2024-06-21")  # replace with your desired expiration date
+        opt = ticker.option_chain("2024-06-28")  # replace with your desired expiration date
     except:
         ticker = yf.Ticker("SPY")
-        opt = ticker.option_chain("2024-06-21")  # replace with your desired expiration date
+        opt = ticker.option_chain("2024-06-28")  # replace with your desired expiration date
 
-    ##############################################################################################
     # Retrieve the premium for each option contract
     try: 
         sc_p = opt.calls.loc[opt.calls['strike'] == sc_s, 'lastPrice'].values[0]
         sp_p = opt.puts.loc[opt.puts['strike'] == sp_s, 'lastPrice'].values[0]
-        lp_p = opt.puts.loc[opt.puts['strike'] == lp_s, 'lastPrice'].values[0]
-        lc_p = opt.calls.loc[opt.calls['strike'] == lc_s, 'lastPrice'].values[0]
+        #lp_p = opt.puts.loc[opt.puts['strike'] == lp_s, 'lastPrice'].values[0]
+        #lc_p = opt.calls.loc[opt.calls['strike'] == lc_s, 'lastPrice'].values[0]
     except:
         sc_p = opt.calls.loc[opt.calls['strike'] == sc_s, 'lastPrice'].values[0]
         sp_p = opt.puts.loc[opt.puts['strike'] == sp_s, 'lastPrice'].values[0]
-        lp_p = opt.puts.loc[opt.puts['strike'] == lp_s, 'lastPrice'].values[0]
-        lc_p = opt.calls.loc[opt.calls['strike'] == lc_s, 'lastPrice'].values[0]
-        
-    print("Strike prices: ", lp_s, sp_s, sc_s, lc_s)
-    print("Premiums: ", lp_p, sp_p, sc_p, lc_p)
-
-    # Calculate statistics for the Iron Condor
-    max_profit, max_loss_p, max_loss_c, break_even_p, break_even_c = calculateStrategy(sp_s, sc_s, lp_s, lc_s, sp_p, sc_p, lp_p, lc_p)
-    rr = calculateRR(max_profit, max_loss_p, max_loss_c)
-    
-    # Print the statistics for the Iron Condor
-    print("Max profit: ", max_profit)
-    print("Max loss - put: ", max_loss_p)
-    print("Max loss - call: ", max_loss_c)
-    print("Break-even points: ", break_even_p, break_even_c)
-    print("Risk-reward ratio: ", abs(rr))
-    print("Expected value: ", calculateEV(rr)*abs(min(max_loss_p, max_loss_c)))
-    print("Expected value (as a ratio): ", calculateEV(rr))
-    print("\n")
-
-    ################################################################################################
+        #lp_p = opt.puts.loc[opt.puts['strike'] == lp_s, 'lastPrice'].values[0]
+        #lc_p = opt.calls.loc[opt.calls['strike'] == lc_s, 'lastPrice'].values[0]
 
     # Retrieve all possible strike prices less than the short put strike
     lp_s_possible = opt.puts[opt.puts['strike'] < sp_s]['strike'].values
@@ -125,7 +108,7 @@ def ironCondorModel(price_paths):
                 iron_condor = IronCondor(sp_s, sc_s, lp_s, lc_s, sp_p, sc_p, lp_p, lc_p, max_profit, max_loss_p, max_loss_c, break_even_p, break_even_c, rr)
     
     # Print the statistics for the optimal Iron Condor
-    print("Best Iron Condor:")
+    print("Optimal Iron Condor: " + str(int(interval*100)) + "% interval")
     print("Strike prices: ", iron_condor.lp_s, iron_condor.sp_s, iron_condor.sc_s, iron_condor.lc_s)
     print("Premiums: ", iron_condor.lp_p, iron_condor.sp_p, iron_condor.sc_p, iron_condor.lc_p)
     print("Max profit: ", iron_condor.max_profit)
@@ -133,11 +116,10 @@ def ironCondorModel(price_paths):
     print("Max loss - call: ", iron_condor.max_loss_c)
     print("Break-even points: ", iron_condor.break_even_p, iron_condor.break_even_c)
     print("Risk-reward ratio: ", abs(iron_condor.rr))
-    print("Expected value: ", calculateEV(iron_condor.rr)*abs(min(iron_condor.max_loss_p, iron_condor.max_loss_c)))
-    print("Expected value (as a ratio): ", calculateEV(iron_condor.rr))
-    print("\n")
-    ################################################################################################
-    
+    print("Minimum risk-reward ratio: ", calculateMinRR(interval))
+    print("Expected value: ", calculateEV(iron_condor.rr, interval)*abs(min(iron_condor.max_loss_p, iron_condor.max_loss_c)))
+    print("Expected value (as a ratio): ", calculateEV(iron_condor.rr, interval))
+    print("\n")    
 
     return
 
@@ -146,14 +128,14 @@ def main():
     #print(data.head(5))
     data.iloc[:, 3].plot(figsize=(10,5))
     #print(data.iloc[:, 3].head(5))
-    mpl.show()
+    #mpl.show()
 
     log_return = np.log(1 + data.iloc[:, 1].pct_change())
     
-    sb.displot(log_return.iloc[1:])
-    mpl.xlabel("Daily Return")
-    mpl.ylabel("Frequency")
-    mpl.show()
+    # sb.displot(log_return.iloc[1:])
+    # mpl.xlabel("Daily Return")
+    # mpl.ylabel("Frequency")
+    # mpl.show()
 
     u = log_return.mean()
     var = log_return.var()
@@ -170,15 +152,23 @@ def main():
     for t in range(1, days):
         price_paths[t] = price_paths[t-1]*daily_returns[t]
     
+    # Print current price:
+    current_price = data.iloc[-1, 3]
+    print("Current SPY price:", current_price)
 
+    # Calculate the inner interval (dictates the range where the Iron Condor will be profitable)
+    INTERVAL = 0.8
+    lower_bound = np.percentile(price_paths, (100-INTERVAL*100)/2)
+    upper_bound = np.percentile(price_paths, 100-(100-INTERVAL*100)/2)
     # Calculate the 95% confidence interval
-    lower_bound = np.percentile(price_paths, 10)
-    upper_bound = np.percentile(price_paths, 90)
-    # Calculate the 99% confidence interval
     lower_bound_1 = np.percentile(price_paths, 2.5)
     upper_bound_1 = np.percentile(price_paths, 97.5)
-    print("80% interval: ", lower_bound, upper_bound)
+    # Calculate the 99% confidence interval
+    lower_bound_2 = np.percentile(price_paths, 0.5)
+    upper_bound_2 = np.percentile(price_paths, 99.5)
+    print(str(int(INTERVAL*100)) + "% interval: ", lower_bound, upper_bound)
     print("95% interval: ", lower_bound_1, upper_bound_1)
+    print("99% interval: ", lower_bound_2, upper_bound_2)
     print("\n")
 
     # # Plotting the price as a probability distribution
@@ -206,11 +196,26 @@ def main():
     # mpl.legend()
     # mpl.show()
 
-    print("Minimum risk-reward ratio: ", calculateMinRR(0.8), "\n")
+    print("Minimum risk-reward ratio: ", calculateMinRR(INTERVAL), "\n")
 
     # Run the Iron Condor model
-    ironCondorModel(price_paths)
-    
+    ironCondorModel(price_paths, INTERVAL)
+    # Run the Iron Condor model with a 95% interval
+    ironCondorModel(price_paths, 0.95)
+    # Run the Iron Condor model with a 90% interval
+    ironCondorModel(price_paths, 0.9)
+    # Run the Iron Condor model with a 85% interval
+    ironCondorModel(price_paths, 0.85)
+    # Run the Iron Condor model with a 75% interval
+    ironCondorModel(price_paths, 0.75)
+    # Run the Iron Condor model with a 70% interval
+    ironCondorModel(price_paths, 0.7)
+
+    # # parallelize the Iron Condor model
+    # intervals = [INTERVAL, 0.95, 0.9, 0.85, 0.75, 0.7]
+    # with ThreadPoolExecutor() as executor:
+    #     for interval in intervals:
+    #         executor.submit(ironCondorModel, price_paths, interval)
 
 if __name__ == '__main__':
     main()
