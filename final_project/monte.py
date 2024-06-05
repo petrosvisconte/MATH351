@@ -24,14 +24,21 @@ class IronCondor:
         self.break_even_p = break_even_p
         self.break_even_c = break_even_c
         self.rr = rr
-      
+
+def importData(ticker):
+    data = yf.download(ticker, '2022-01-01', '2024-05-10')
+    return data
+
 def calculateRR(max_profit, max_loss_p, max_loss_c):
     return max_profit / min(max_loss_p, max_loss_c)
 
 # Note that this is set up for an 80% interval, needs to be modified for different intervals
-def calculateExpectedValue(rr):
-    return abs(rr)*0.8 - 1*0.2
+# Expected value
+def calculateEV(rr):
+    return abs(rr)*0.8- 1*0.2
 
+def calculateMinRR(interval):
+    return (1-interval)/interval
 
 def calculateStrategy(sp_s, sc_s, lp_s, lc_s, sp_p, sc_p, lp_p, lc_p):
     max_profit = (sp_p + sc_p - lp_p - lc_p) * 100.0
@@ -41,10 +48,6 @@ def calculateStrategy(sp_s, sc_s, lp_s, lc_s, sp_p, sc_p, lp_p, lc_p):
     break_even_c = sc_s + (sc_p + lc_p)
 
     return max_profit, max_loss_p, max_loss_c, break_even_p, break_even_c
-
-def importData(ticker):
-    data = yf.download(ticker, '2022-01-01', '2024-05-10')
-    return data
 
 def ironCondorModel(price_paths):
     # Define Iron Condor strikes based on percentiles and round to the nearest integer
@@ -86,9 +89,9 @@ def ironCondorModel(price_paths):
     print("Max loss - put: ", max_loss_p)
     print("Max loss - call: ", max_loss_c)
     print("Break-even points: ", break_even_p, break_even_c)
-    print("Risk-reward ratio: ", rr)
-    print("Expected value: ", calculateExpectedValue(rr)*abs(min(max_loss_p, max_loss_c)))
-    print("Expected value (as a ratio): ", calculateExpectedValue(rr))
+    print("Risk-reward ratio: ", abs(rr))
+    print("Expected value: ", calculateEV(rr)*abs(min(max_loss_p, max_loss_c)))
+    print("Expected value (as a ratio): ", calculateEV(rr))
     print("\n")
 
     ################################################################################################
@@ -129,9 +132,9 @@ def ironCondorModel(price_paths):
     print("Max loss - put: ", iron_condor.max_loss_p)
     print("Max loss - call: ", iron_condor.max_loss_c)
     print("Break-even points: ", iron_condor.break_even_p, iron_condor.break_even_c)
-    print("Risk-reward ratio: ", iron_condor.rr)
-    print("Expected value: ", calculateExpectedValue(iron_condor.rr)*abs(min(iron_condor.max_loss_p, iron_condor.max_loss_c)))
-    print("Expected value (as a ratio): ", calculateExpectedValue(iron_condor.rr))
+    print("Risk-reward ratio: ", abs(iron_condor.rr))
+    print("Expected value: ", calculateEV(iron_condor.rr)*abs(min(iron_condor.max_loss_p, iron_condor.max_loss_c)))
+    print("Expected value (as a ratio): ", calculateEV(iron_condor.rr))
     print("\n")
     ################################################################################################
     
@@ -158,7 +161,7 @@ def main():
 
     stdev = log_return.std()
     days = 14
-    trials = 20000
+    trials = 100000
     Z = norm.ppf(np.random.rand(days, trials))
     daily_returns = np.exp(drift + stdev * Z)
 
@@ -176,6 +179,7 @@ def main():
     upper_bound_1 = np.percentile(price_paths, 97.5)
     print("80% interval: ", lower_bound, upper_bound)
     print("95% interval: ", lower_bound_1, upper_bound_1)
+    print("\n")
 
     # # Plotting the price as a probability distribution
     # sb.displot(price_paths, bins=30, color='blue', legend=False)
@@ -201,6 +205,8 @@ def main():
     # mpl.title('Price Paths')
     # mpl.legend()
     # mpl.show()
+
+    print("Minimum risk-reward ratio: ", calculateMinRR(0.8), "\n")
 
     # Run the Iron Condor model
     ironCondorModel(price_paths)
