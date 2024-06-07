@@ -15,7 +15,7 @@ from monte import importData, calculateEV, calculateMinRR, IronCondor, calculate
 
 
 def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, interval):
-    # Subtract 5 years from the historical start date
+    # Subtract years defined by memory from the historical start date
     date_obj = datetime.strptime(hist_start_date, '%Y-%m-%d')
     new_date_obj = date_obj - relativedelta(years=memory)
     start_date = new_date_obj.strftime('%Y-%m-%d')
@@ -23,6 +23,9 @@ def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, i
 
     # Import historical data required
     all_hist_data = importData(ticker, start_date, end_date)
+
+    # Define data structures to store price information
+    exceeded_interval = pd.DataFrame(columns=['Start Date', 'End Date', 'Interval', 'Ending Price'])
 
     while end_date != hist_end_date:
         # Retrieve the historical data for the specified interval
@@ -36,9 +39,24 @@ def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, i
         # Calculate the price paths for the specified interval
         price_paths = calculatePricePaths(historical_data, days, 1000)
 
+        # TODO: Modify ironCondorModel to access historical options data
         # Generate the optimal Iron Condor model
-        IronCondor = ironCondorModel(price_paths, interval, ticker)
+        # IronCondor = ironCondorModel(price_paths, interval, ticker, expiry)
 
+        # Calculate price interval
+        offset = (100-interval*100)/2
+        sp_s = round(np.percentile(price_paths, offset))
+        sc_s = round(np.percentile(price_paths, 100-offset))
+
+        # Check if the price on the expiry date is within the interval
+        end_price = historical_data.iloc[-1, 3] # TODO: Get price a month from this date, need to add another month of data to historical_data
+        if end_price >= sp_s and end_price <= sc_s:
+            print("Price is within the interval")
+        else:
+            print("Price is outside the interval")
+            exceeded_interval = exceeded_interval.append({'Date': start_date, 'End Date': end_date, 'Interval': (sp_s, sc_s), 'Ending Price': end_price}, ignore_index=True)
+
+        
         print(start_date, end_date)
         # Add a month to the end date
         date_obj = datetime.strptime(end_date, '%Y-%m-%d')
@@ -56,7 +74,7 @@ def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, i
     return
 
 # Find the optimal Iron Condor strikes
-def ironCondorModel(price_paths, interval, ticker):
+def ironCondorModel(price_paths, interval, ticker, expiry):
     # Define Iron Condor strikes based on percentiles and round to the nearest integer
     offset = (100-interval*100)/2
     sp_s = round(np.percentile(price_paths, offset))
@@ -67,10 +85,10 @@ def ironCondorModel(price_paths, interval, ticker):
     # Retrieve the option chain for SPY
     try:
         tickr = yf.Ticker(ticker)
-        opt = tickr.option_chain("2024-06-28")  # replace with your desired expiration date
+        opt = tickr.option_chain(expiry)
     except:
         tickr = yf.Ticker(ticker)
-        opt = tickr.option_chain("2024-06-28")  # replace with your desired expiration date
+        opt = tickr.option_chain(expiry)
 
     # Retrieve the premium for each option contract
     try: 
@@ -184,7 +202,7 @@ def trading_days(start_date, end_date):
 
 
 def main():
-    analyzeProbabilityInterval('2000-01-01', '2024-05-01', 'SPY', 5, 0.90)
+    analyzeProbabilityInterval('2000-01-01', '2024-05-01', 'SPY', 5, 0.70)
 
 
 
