@@ -28,8 +28,8 @@ class IronCondor:
         self.break_even_c = sc_s + (sc_p + lc_p)
         self.rr = self.max_profit / min(self.max_loss_p, self.max_loss_c)
 
-def importData(ticker):
-    data = yf.download(ticker, '2000-01-01', '2024-06-05')
+def importData(ticker, start_date, end_date):
+    data = yf.download(ticker, start=start_date, end=end_date)
     return data
 
 # Expected value
@@ -39,6 +39,24 @@ def calculateEV(rr, interval):
 # Minimum RR required to break even
 def calculateMinRR(interval):
     return (1-interval)/interval
+
+def calculatePricePaths(data, days, trials):
+    log_return = np.log(1 + data.iloc[:, 1].pct_change())
+
+    u = log_return.mean()
+    var = log_return.var()
+    drift = u - (0.5*var)
+
+    stdev = log_return.std()
+    Z = norm.ppf(np.random.rand(days, trials))
+    daily_returns = np.exp(drift + stdev * Z)
+
+    price_paths = np.zeros_like(daily_returns)
+    price_paths[0] = data.iloc[-1, 3]
+    for t in range(1, days):
+        price_paths[t] = price_paths[t-1]*daily_returns[t]
+
+    return price_paths
 
 # Find the optimal Iron Condor strikes
 def ironCondorModel(price_paths, interval, ticker):
@@ -116,15 +134,15 @@ def ironCondorModel(price_paths, interval, ticker):
 def main():
     INTERVAL = 0.8
     # ETFs
-    #TICKER = 'SPY' # S&P 500
+    TICKER = 'SPY' # S&P 500
     #TICKER = 'QQQ' # Nasdaq
     #TICKER = 'IWM' # Russell 2000
     #TICKER = 'TLT' # 20+ Year Treasury Bond
     #TICKER = 'SLV' # Silver
-    TICKER = 'GDX' # Gold Miners
+    #TICKER = 'GDX' # Gold Miners
     # Stocks
 
-    data = importData(TICKER)
+    data = importData(TICKER, '2000-01-01', '2024-06-06')
     #print(data.head(5))
     data.iloc[:, 3].plot(figsize=(10,5))
     #print(data.iloc[:, 3].head(5))
@@ -139,22 +157,10 @@ def main():
     mpl.xlabel("Daily Return")
     mpl.ylabel("Frequency")
     mpl.title("Distribution of Daily Log Returns for " + TICKER)
-    #mpl.show()
+    mpl.show()
 
-    u = log_return.mean()
-    var = log_return.var()
-    drift = u - (0.5*var)
-
-    stdev = log_return.std()
-    days = 14
-    trials = 100000
-    Z = norm.ppf(np.random.rand(days, trials))
-    daily_returns = np.exp(drift + stdev * Z)
-
-    price_paths = np.zeros_like(daily_returns)
-    price_paths[0] = data.iloc[-1, 3]
-    for t in range(1, days):
-        price_paths[t] = price_paths[t-1]*daily_returns[t]
+    # Calculate the price paths for the next 14 days
+    price_paths = calculatePricePaths(data, 14, 10000)
     
     # Print current price:
     current_price = data.iloc[-1, 3]
