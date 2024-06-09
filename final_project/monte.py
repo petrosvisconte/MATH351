@@ -62,10 +62,10 @@ def calculatePricePaths(data, days, trials):
 def ironCondorModel(price_paths, interval, ticker):
     # Define Iron Condor strikes based on percentiles and round to the nearest integer
     offset = (100-interval*100)/2
-    sp_s = round(np.percentile(price_paths, offset))
-    sc_s = round(np.percentile(price_paths, 100-offset))
-    lp_s = round(np.percentile(price_paths, 2.5)) 
-    lc_s = round(np.percentile(price_paths, 97.5))
+    sp_s = round(np.percentile(price_paths[-1], offset))
+    sc_s = round(np.percentile(price_paths[-1], 100-offset))
+    lp_s = round(np.percentile(price_paths[-1], 2.5)) 
+    lc_s = round(np.percentile(price_paths[-1], 97.5))
     
     # Retrieve the option chain for SPY
     try:
@@ -134,11 +134,11 @@ def ironCondorModel(price_paths, interval, ticker):
 def main():
     INTERVAL = 0.8
     # ETFs
-    TICKER = 'SPY' # S&P 500
+    #TICKER = 'SPY' # S&P 500
     #TICKER = 'QQQ' # Nasdaq
     #TICKER = 'IWM' # Russell 2000
     #TICKER = 'TLT' # 20+ Year Treasury Bond
-    #TICKER = 'SLV' # Silver
+    TICKER = 'SLV' # Silver
     #TICKER = 'GDX' # Gold Miners
     # Stocks
 
@@ -167,14 +167,14 @@ def main():
     print("Current", TICKER, "price:", current_price)
 
     # Calculate the inner interval (dictates the range where the Iron Condor will be profitable)
-    lower_bound = np.percentile(price_paths, (100-INTERVAL*100)/2)
-    upper_bound = np.percentile(price_paths, 100-(100-INTERVAL*100)/2)
+    lower_bound = np.percentile(price_paths[-1], (100-INTERVAL*100)/2)
+    upper_bound = np.percentile(price_paths[-1], 100-(100-INTERVAL*100)/2)
     # Calculate the 95% confidence interval
-    lower_bound_1 = np.percentile(price_paths, 2.5)
-    upper_bound_1 = np.percentile(price_paths, 97.5)
+    lower_bound_1 = np.percentile(price_paths[-1], 2.5)
+    upper_bound_1 = np.percentile(price_paths[-1], 97.5)
     # Calculate the 99% confidence interval
-    lower_bound_2 = np.percentile(price_paths, 0.5)
-    upper_bound_2 = np.percentile(price_paths, 99.5)
+    lower_bound_2 = np.percentile(price_paths[-1], 0.5)
+    upper_bound_2 = np.percentile(price_paths[-1], 99.5)
     print(str(int(INTERVAL*100)) + "% interval: ", lower_bound, upper_bound)
     print("95% interval: ", lower_bound_1, upper_bound_1)
     print("99% interval: ", lower_bound_2, upper_bound_2)
@@ -210,7 +210,7 @@ def main():
     # Run the Iron Condor model
     ironCondorModel(price_paths, INTERVAL, TICKER)
     # Run the Iron Condor model with a 95% interval
-    ironCondorModel(price_paths, 0.95, TICKER)
+    #ironCondorModel(price_paths, 0.95, TICKER)
     # Run the Iron Condor model with a 90% interval
     ironCondorModel(price_paths, 0.9, TICKER)
     # Run the Iron Condor model with a 85% interval

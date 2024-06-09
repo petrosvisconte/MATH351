@@ -47,12 +47,12 @@ def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, i
 
         # TODO: Modify ironCondorModel to access historical options data
         # Generate the optimal Iron Condor model
-        # IronCondor = ironCondorModel(price_paths, interval, ticker, expiry)
+        #IronCondor = ironCondorModel(price_paths, interval, ticker, expiry)
 
         # Calculate price interval
         offset = (100-interval*100)/2
-        sp_s = round(np.percentile(price_paths, offset))
-        sc_s = round(np.percentile(price_paths, 100-offset))
+        sp_s = round(np.percentile(price_paths[-1], offset))
+        sc_s = round(np.percentile(price_paths[-1], 100-offset))
         #print(sp_s, sc_s)
 
         # Check if the price on the expiry date is within the interval
@@ -220,6 +220,7 @@ def trading_days(start_date, end_date):
 
 
 def main():
+    print(trading_days('2024-06-09', '2024-06-28'))
     analyzeProbabilityInterval('2000-01-01', '2024-05-01', 'SPY', 10, 0.90)
 
 
