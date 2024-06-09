@@ -22,22 +22,28 @@ def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, i
     end_date = hist_start_date
 
     # Import historical data required
-    all_hist_data = importData(ticker, start_date, end_date)
+    all_hist_data = importData(ticker, start_date, hist_end_date)
 
     # Define data structures to store price information
-    exceeded_interval = pd.DataFrame(columns=['Start Date', 'End Date', 'Interval', 'Ending Price'])
+    within_interval = pd.DataFrame(columns=['Start Date', 'End Date', 'Trading Days', 'Interval', 'Ending Price'])
+    exceeded_interval = pd.DataFrame(columns=['Start Date', 'End Date', 'Trading Days', 'Interval', 'Ending Price'])
 
+    price_in = 0
+    price_out = 0
     while end_date != hist_end_date:
+        print(start_date, end_date)
+        # Find the expiry date for the monthly options contract
+        expiry = find_monthly_expiry(int(end_date[:4]), int(end_date[5:7]))
+
+        # Find the number of trading days between the start and expiry date
+        days = trading_days(end_date, expiry)
+        #print(expiry, days)
+        
         # Retrieve the historical data for the specified interval
         historical_data = all_hist_data.loc[start_date:end_date]
 
-        # Find the expiry date for the monthly options contract
-        expiry = find_monthly_expiry(int(end_date[:4]), int(end_date[5:7]))
-        # Find the number of trading days between the start and expiry date
-        days = trading_days(end_date, expiry)
-
         # Calculate the price paths for the specified interval
-        price_paths = calculatePricePaths(historical_data, days, 1000)
+        price_paths = calculatePricePaths(historical_data, days, 10000)
 
         # TODO: Modify ironCondorModel to access historical options data
         # Generate the optimal Iron Condor model
@@ -47,17 +53,25 @@ def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, i
         offset = (100-interval*100)/2
         sp_s = round(np.percentile(price_paths, offset))
         sc_s = round(np.percentile(price_paths, 100-offset))
+        #print(sp_s, sc_s)
 
         # Check if the price on the expiry date is within the interval
-        end_price = historical_data.iloc[-1, 3] # TODO: Get price a month from this date, need to add another month of data to historical_data
+        end_price = all_hist_data.loc[end_date:expiry]
+        # Get ending price on last day of interval
+        end_price = end_price['Close'].iloc[-1]
+        #print(end_price)
         if end_price >= sp_s and end_price <= sc_s:
-            print("Price is within the interval")
+            price_in += 1
+            #print("Price is within the interval")
+            within_interval = pd.concat([within_interval, pd.DataFrame([{'Start Date': end_date, 'End Date': expiry, 
+                                'Trading Days': days, 'Interval': (sp_s, sc_s), 'Ending Price': end_price}])], ignore_index=True)
         else:
-            print("Price is outside the interval")
-            exceeded_interval = exceeded_interval.append({'Date': start_date, 'End Date': end_date, 'Interval': (sp_s, sc_s), 'Ending Price': end_price}, ignore_index=True)
+            price_out += 1
+            #print("Price is outside the interval")
+            exceeded_interval = pd.concat([exceeded_interval, pd.DataFrame([{'Start Date': end_date, 'End Date': 
+                                    expiry, 'Trading Days': days, 'Interval': (sp_s, sc_s), 'Ending Price': end_price}])], ignore_index=True)
 
         
-        print(start_date, end_date)
         # Add a month to the end date
         date_obj = datetime.strptime(end_date, '%Y-%m-%d')
         new_date_obj = date_obj + relativedelta(months=1)
@@ -65,11 +79,15 @@ def analyzeProbabilityInterval(hist_start_date, hist_end_date, ticker, memory, i
         # Add a month to the start date
         date_obj = datetime.strptime(start_date, '%Y-%m-%d')
         new_date_obj = date_obj + relativedelta(months=1)
-        start_date = new_date_obj.strftime('%Y-%m-%d')
-        print(start_date, end_date)
-        
+        start_date = new_date_obj.strftime('%Y-%m-%d')        
 
-
+    print("Price within the interval: ", price_in)
+    print("Price outside the interval: ", price_out)
+    print("Probability of price within the interval: ", price_in/(price_in+price_out))
+    print(exceeded_interval)
+    print(within_interval)
+    print("Average trading days within interval: ", within_interval['Trading Days'].mean())
+    print("Average trading days outside interval: ", exceeded_interval['Trading Days'].mean())
     
     return
 
@@ -202,7 +220,7 @@ def trading_days(start_date, end_date):
 
 
 def main():
-    analyzeProbabilityInterval('2000-01-01', '2024-05-01', 'SPY', 5, 0.70)
+    analyzeProbabilityInterval('2000-01-01', '2024-05-01', 'SPY', 10, 0.90)
 
 
 
