@@ -6,7 +6,6 @@ import yfinance as yf
 import matplotlib.pyplot as mpl
 import seaborn as sb
 from scipy.stats import norm
-from concurrent.futures import ThreadPoolExecutor
 
 
 
@@ -129,56 +128,56 @@ def ironCondorModel(price_paths, interval, ticker):
     print("Expected value (as a ratio): ", calculateEV(iron_condor.rr, interval))
     print("\n")    
 
-    return
+    return IronCondor
 
 def main():
     INTERVAL = 0.8
     # ETFs
-    #TICKER = 'SPY' # S&P 500
+    TICKER = 'SPY' # S&P 500
     #TICKER = 'QQQ' # Nasdaq
     #TICKER = 'IWM' # Russell 2000
     #TICKER = 'TLT' # 20+ Year Treasury Bond
-    TICKER = 'SLV' # Silver
+    #TICKER = 'SLV' # Silver
     #TICKER = 'GDX' # Gold Miners
     # Stocks
 
-    data = importData(TICKER, '2000-01-01', '2024-06-06')
+    data = importData(TICKER, '2014-01-01', '2024-06-12')
     #print(data.head(5))
     data.iloc[:, 3].plot(figsize=(10,5))
     #print(data.iloc[:, 3].head(5))
     mpl.xlabel("Time")
     mpl.ylabel("Price")
     mpl.title(TICKER + " Historical Price Data")
-    mpl.show()
+    #mpl.show()
 
     log_return = np.log(1 + data.iloc[:, 1].pct_change())
     
-    sb.displot(log_return.iloc[1:], bins=100, kde=True)
-    mpl.xlabel("Daily Return")
-    mpl.ylabel("Frequency")
-    mpl.title("Distribution of Daily Log Returns for " + TICKER)
-    mpl.show()
+    # sb.displot(log_return.iloc[1:], bins=100, kde=True)
+    # mpl.xlabel("Daily Return")
+    # mpl.ylabel("Frequency")
+    # mpl.title("Distribution of Daily Log Returns for " + TICKER)
+    # mpl.show()
 
     # Calculate the price paths for the next 14 days
-    price_paths = calculatePricePaths(data, 14, 10000)
+    price_paths = calculatePricePaths(data, 13, 100000)
     
     # Print current price:
     current_price = data.iloc[-1, 3]
-    print("Current", TICKER, "price:", current_price)
+    print("Current", TICKER, "price:", current_price, "\n")
 
-    # Calculate the inner interval (dictates the range where the Iron Condor will be profitable)
-    lower_bound = np.percentile(price_paths[-1], (100-INTERVAL*100)/2)
-    upper_bound = np.percentile(price_paths[-1], 100-(100-INTERVAL*100)/2)
-    # Calculate the 95% confidence interval
-    lower_bound_1 = np.percentile(price_paths[-1], 2.5)
-    upper_bound_1 = np.percentile(price_paths[-1], 97.5)
-    # Calculate the 99% confidence interval
-    lower_bound_2 = np.percentile(price_paths[-1], 0.5)
-    upper_bound_2 = np.percentile(price_paths[-1], 99.5)
-    print(str(int(INTERVAL*100)) + "% interval: ", lower_bound, upper_bound)
-    print("95% interval: ", lower_bound_1, upper_bound_1)
-    print("99% interval: ", lower_bound_2, upper_bound_2)
-    print("\n")
+    # # Calculate the inner interval (dictates the range where the Iron Condor will be profitable)
+    # lower_bound = np.percentile(price_paths[-1], (100-INTERVAL*100)/2)
+    # upper_bound = np.percentile(price_paths[-1], 100-(100-INTERVAL*100)/2)
+    # # Calculate the 95% confidence interval
+    # lower_bound_1 = np.percentile(price_paths[-1], 2.5)
+    # upper_bound_1 = np.percentile(price_paths[-1], 97.5)
+    # # Calculate the 99% confidence interval
+    # lower_bound_2 = np.percentile(price_paths[-1], 0.5)
+    # upper_bound_2 = np.percentile(price_paths[-1], 99.5)
+    # print(str(int(INTERVAL*100)) + "% interval: ", lower_bound, upper_bound)
+    # print("95% interval: ", lower_bound_1, upper_bound_1)
+    # print("99% interval: ", lower_bound_2, upper_bound_2)
+    # print("\n")
 
     # # Plotting the predicted price as a probability distribution
     # sb.displot(price_paths[-1], bins=50, color='blue', legend=False, kde=True)
@@ -208,27 +207,33 @@ def main():
     #print("Minimum risk-reward ratio: ", calculateMinRR(INTERVAL), "\n")
 
     # Run the Iron Condor model
-    ironCondorModel(price_paths, INTERVAL, TICKER)
+    #ironCondorModel(price_paths, INTERVAL, TICKER)
     # Run the Iron Condor model with a 95% interval
     #ironCondorModel(price_paths, 0.95, TICKER)
     # Run the Iron Condor model with a 90% interval
     ironCondorModel(price_paths, 0.9, TICKER)
     # Run the Iron Condor model with a 85% interval
-    ironCondorModel(price_paths, 0.85, TICKER)
+    #ironCondorModel(price_paths, 0.85, TICKER)
+    # Run the Iron Condor model with a 80% interval
+    ironCondorModel(price_paths, 0.8, TICKER)
     # Run the Iron Condor model with a 75% interval
-    ironCondorModel(price_paths, 0.75, TICKER)
+    #ironCondorModel(price_paths, 0.75, TICKER)
     # Run the Iron Condor model with a 70% interval
     ironCondorModel(price_paths, 0.7, TICKER)
     # Run the Iron Condor model with a 65% interval
-    ironCondorModel(price_paths, 0.65, TICKER)
+    #ironCondorModel(price_paths, 0.65, TICKER)
     # Run the Iron Condor model with a 60% interval
     ironCondorModel(price_paths, 0.6, TICKER)
 
-    # # parallelize the Iron Condor model
-    # intervals = [INTERVAL, 0.95, 0.9, 0.85, 0.75, 0.7]
-    # with ThreadPoolExecutor() as executor:
-    #     for interval in intervals:
-    #         executor.submit(ironCondorModel, price_paths, interval)
+    data = importData('TLT', '2014-01-01', '2024-06-12')
+    data.iloc[:, 3].plot(figsize=(10,5))
+    price_paths = calculatePricePaths(data, 13, 100000)
+    ironCondorModel(price_paths, 0.9, 'TLT')
+    ironCondorModel(price_paths, 0.8, 'TLT')
+    ironCondorModel(price_paths, 0.7, 'TLT')
+    ironCondorModel(price_paths, 0.6, 'TLT')
+
+
 
 if __name__ == '__main__':
     main()
