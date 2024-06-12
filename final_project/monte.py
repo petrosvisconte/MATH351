@@ -228,6 +228,9 @@ def main():
     data = importData('TLT', '2014-01-01', '2024-06-12')
     data.iloc[:, 3].plot(figsize=(10,5))
     price_paths = calculatePricePaths(data, 13, 100000)
+    # Print current price:
+    current_price = data.iloc[-1, 3]
+    print("Current", 'TLT', "price:", current_price, "\n")
     ironCondorModel(price_paths, 0.9, 'TLT')
     ironCondorModel(price_paths, 0.8, 'TLT')
     ironCondorModel(price_paths, 0.7, 'TLT')
